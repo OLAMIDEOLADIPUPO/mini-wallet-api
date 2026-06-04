@@ -2,18 +2,17 @@ package com.olamide.miniwalletapi.Controller;
 
 import com.olamide.miniwalletapi.DTO.DepositRequestDTO;
 import com.olamide.miniwalletapi.DTO.TransactionResponseDTO;
-import com.olamide.miniwalletapi.DTO.TransferRequestDTO; // Added missing import
+import com.olamide.miniwalletapi.DTO.TransferRequestDTO;
 import com.olamide.miniwalletapi.DTO.WithdrawRequestDTO;
 import com.olamide.miniwalletapi.Service.TransactionService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("api/transactions") // Refactored to standard pluralized REST naming conventions
+@RequestMapping("api/transactions")
 public class TransactionController {
 
     private final TransactionService transactionService;
@@ -33,7 +32,7 @@ public class TransactionController {
         return ResponseEntity.ok(transactionService.withdraw(withdrawRequestDTO));
     }
 
-    @PostMapping("/transfer") // Exposing your transfer service method
+    @PostMapping("/transfer")
     public ResponseEntity<TransactionResponseDTO> transfer(@Valid @RequestBody TransferRequestDTO transferRequestDTO) {
         return ResponseEntity.ok(transactionService.transfer(transferRequestDTO));
     }

@@ -13,26 +13,30 @@ public class Wallet {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String ownerName;
+
+
+    @OneToOne
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @Column(unique = true,  nullable = false)
     private UUID walletNumber = UUID.randomUUID();
+
     private BigDecimal balance = BigDecimal.ZERO;
+
     private Instant createdAt = Instant.now();
+
     @Column(name = "is_active", nullable = false, columnDefinition = "boolean default true")
     private boolean isActive = true;
 
+    protected Wallet() {}  // JPA only
+
+    public Wallet(User user) {
+        this.user = user;
+    }
+
     public Long getId() {
         return id;
-    }
-    public void setId(Long id) {
-        this.id = id;
-    }
-    public String getOwnerName() {
-        return ownerName;
-    }
-    public void setOwnerName(String ownerName) {
-        this.ownerName = ownerName;
     }
     public boolean isActive() {
         return isActive;
@@ -43,9 +47,10 @@ public class Wallet {
     public UUID getWalletNumber() {
         return walletNumber;
     }
-    public void setWalletNumber(UUID walletNumber) {
-        this.walletNumber = walletNumber;
+    public User getUser() {
+        return user;
     }
+
     public BigDecimal getBalance() {
         return balance;
     }

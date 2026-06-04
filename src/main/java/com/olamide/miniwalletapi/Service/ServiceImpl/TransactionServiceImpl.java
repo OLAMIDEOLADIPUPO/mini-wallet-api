@@ -4,6 +4,7 @@
     import com.olamide.miniwalletapi.DTO.TransactionResponseDTO;
     import com.olamide.miniwalletapi.DTO.TransferRequestDTO;
     import com.olamide.miniwalletapi.DTO.WithdrawRequestDTO;
+    import com.olamide.miniwalletapi.Exceptions.InvalidTransactionException;
     import com.olamide.miniwalletapi.Exceptions.WalletDeactivatedException;
     import com.olamide.miniwalletapi.Exceptions.WalletNotFoundException;
     import com.olamide.miniwalletapi.Models.Transaction;
@@ -35,7 +36,8 @@
                                                 saved.getType(),
                                                 saved.getTimestamp());
         }
-    
+
+        @Override
         @Transactional
         public TransactionResponseDTO deposit(DepositRequestDTO request) {
                 Wallet found = walletRepository.findById(request.destinationWalletId()).orElseThrow(() -> new WalletNotFoundException("Wallet with id " +request.destinationWalletId()+ " not found") );
@@ -52,7 +54,8 @@
     
     
         }
-    
+
+        @Override
         @Transactional
         public TransactionResponseDTO withdraw(WithdrawRequestDTO request) {
             Wallet found = walletRepository.findById(request.sourceWalletId()).orElseThrow(() -> new WalletNotFoundException("Wallet with id " +request.sourceWalletId()+ " not found") );
@@ -67,9 +70,13 @@
     
     
         }
-    
+
+        @Override
         @Transactional
         public TransactionResponseDTO transfer(TransferRequestDTO transferRequest) {
+            if (transferRequest.sourceWalletId().equals(transferRequest.destinationWalletId())) {
+                throw new InvalidTransactionException("Transfer failed: Source and destination wallets cannot be the same account.");
+            }
             Wallet sender = walletRepository.findById(transferRequest.sourceWalletId()).orElseThrow(() -> new WalletNotFoundException("Wallet with id " +transferRequest.sourceWalletId()+ " not found") );
             Wallet receiver = walletRepository.findById(transferRequest.destinationWalletId()).orElseThrow(() -> new WalletNotFoundException("Wallet with id " +transferRequest.destinationWalletId()+ " not found"));
 
@@ -92,6 +99,8 @@
     
     
         }
+
+        @Override
         public TransactionResponseDTO findById(Long Id) {
             return (transactionRepository.findById(Id).map(
                     transaction -> new TransactionResponseDTO(
@@ -103,8 +112,9 @@
                     )
             ).orElseThrow(() -> new WalletNotFoundException("No transaction with id " + Id)));
         }
-    
-    
+
+
+        @Override
         public List<TransactionResponseDTO> getTransactionHistory(Long walletId) {
             return transactionRepository.findAllByWalletId(walletId)
                     .stream()

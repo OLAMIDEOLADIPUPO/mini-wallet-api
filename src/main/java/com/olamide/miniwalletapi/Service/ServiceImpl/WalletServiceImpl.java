@@ -1,18 +1,19 @@
 package com.olamide.miniwalletapi.Service.ServiceImpl;
 
-import com.olamide.miniwalletapi.DTO.UserRequestDTO;
 import com.olamide.miniwalletapi.DTO.UserResponseDTO;
 
-import com.olamide.miniwalletapi.Exceptions.InvalidWalletDetailsException;
 import com.olamide.miniwalletapi.Exceptions.WalletDeactivatedException;
 import com.olamide.miniwalletapi.Exceptions.WalletNotFoundException;
 import com.olamide.miniwalletapi.Models.Wallet;
+import com.olamide.miniwalletapi.Repository.UserRepository;
 import com.olamide.miniwalletapi.Repository.WalletRepository;
 import com.olamide.miniwalletapi.Service.WalletService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
+
+import static java.util.stream.Collectors.toList;
 
 @Service
 public class WalletServiceImpl implements WalletService {
@@ -22,54 +23,33 @@ public class WalletServiceImpl implements WalletService {
         this.walletRepository = walletRepository;
     }
 
-    public UserResponseDTO createWallet(UserRequestDTO request) throws InvalidWalletDetailsException {
-        Wallet wallet = new Wallet();
-        wallet.setOwnerName(request.ownerName());
-        Wallet saved =  walletRepository.save(wallet);
 
-        return new  UserResponseDTO(
-                saved.getOwnerName(),
-                saved.getWalletNumber(),
-                saved.getBalance(),
-                saved.isActive()
+    private UserResponseDTO mapToDTO(Wallet wallet) {
+        return new UserResponseDTO(
+                wallet.getUser().getEmail(),
+                wallet.getWalletNumber(),
+                wallet.getBalance(),
+                wallet.isActive()
         );
-
-
     }
+
     public List<UserResponseDTO> getWallets() {
-       return walletRepository.findAll().stream().map(
-               wallet -> new UserResponseDTO(
-                       wallet.getOwnerName(),
-                       wallet.getWalletNumber(),
-                       wallet.getBalance(),
-                       wallet.isActive()
-               )
-       ).toList();
+       return walletRepository.findAll().stream()
+               .map(this::mapToDTO)
+       .toList();
 
     }
 
     public UserResponseDTO findWalletById(Long id){
-        return walletRepository.findById(id).map(
-                wallet -> new UserResponseDTO(
-                        wallet.getOwnerName(),
-                        wallet.getWalletNumber(),
-                        wallet.getBalance(),
-                        wallet.isActive()
-                )
+        return walletRepository.findById(id).map(this::mapToDTO)
 
-        ).orElseThrow(() -> new WalletNotFoundException("Wallet with id " +id +" not found"));
+        .orElseThrow(() -> new WalletNotFoundException("Wallet with id " +id +" not found"));
     }
 
     public UserResponseDTO findByWalletNumber(UUID walletNumber){
-        return walletRepository.findByWalletNumber(walletNumber).map(
-                        wallet -> new UserResponseDTO(
-                                wallet.getOwnerName(),
-                                wallet.getWalletNumber(),
-                                wallet.getBalance(),
-                                wallet.isActive()
-                        )
+        return walletRepository.findByWalletNumber(walletNumber).map(this::mapToDTO)
 
-                ).orElseThrow(() -> new WalletNotFoundException("Wallet with wallet number " +walletNumber +"not found"));
+                .orElseThrow(() -> new WalletNotFoundException("Wallet with wallet number " +walletNumber +"not found"));
     }
 
     public UserResponseDTO deleteWallet(Long id) {
@@ -81,13 +61,7 @@ public class WalletServiceImpl implements WalletService {
         }
 
         wallet.setActive(false);
-        Wallet saved = walletRepository.save(wallet);
+        return mapToDTO( walletRepository.save(wallet));
 
-        return new UserResponseDTO(
-                saved.getOwnerName(),
-                saved.getWalletNumber(),
-                saved.getBalance(),
-                saved.isActive()
-        );
     }
 }

@@ -1,6 +1,5 @@
 package com.olamide.miniwalletapi.Controller;
 
-import com.olamide.miniwalletapi.DTO.UserRequestDTO;
 import com.olamide.miniwalletapi.DTO.UserResponseDTO;
 import com.olamide.miniwalletapi.Service.WalletService;
 import jakarta.validation.Valid;
@@ -17,11 +16,14 @@ public class WalletController {
     public WalletController(WalletService walletService) {
         this.walletService = walletService;
     }
-    @PostMapping
-    public ResponseEntity<UserResponseDTO> createWallet(@Valid @RequestBody UserRequestDTO request){
-        UserResponseDTO response = walletService.createWallet(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
+
+    /**
+     * public ResponseEntity<UserResponseDTO> createWallet(@Valid @RequestBody UserRequestDTO request){
+     *         UserResponseDTO response = walletService.createWallet(request);
+     *         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+     *     }
+
+ **/
     @GetMapping("{id}")
     public ResponseEntity<UserResponseDTO>findWalletById( @PathVariable Long id){
         UserResponseDTO response =  walletService.findWalletById(id);
