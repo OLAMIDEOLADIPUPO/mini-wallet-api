@@ -1,8 +1,8 @@
 # 💳 Mini Wallet Ledger API
 
-A production-quality RESTful wallet management API built with Spring Boot, designed to simulate core fintech operations — wallet creation, fund deposits, withdrawals, and peer-to-peer transfers — with full transaction history and robust business rule enforcement.
+A production-quality RESTful wallet management API built with Spring Boot, designed to simulate core fintech operations — user registration, authentication, wallet management, fund deposits, withdrawals, and peer-to-peer transfers — with full transaction history, JWT-based security, and robust business rule enforcement.
 
-> Built from scratch as a deliberate learning project, applying real-world fintech engineering principles: immutable transaction records, defensive balance management, soft deletes for audit trail preservation, and clean layered architecture.
+Built from scratch as a deliberate learning project, applying real-world fintech engineering principles: stateless JWT authentication, role-based access control, immutable transaction records, defensive balance management, soft deletes for audit trail preservation, and clean layered architecture.
 
 ---
 
@@ -12,6 +12,7 @@ A production-quality RESTful wallet management API built with Spring Boot, desig
 |---|---|
 | Language | Java 21 |
 | Framework | Spring Boot 4.0 |
+| Security | Spring Security 7 + JWT (JJWT 0.12) |
 | Database | PostgreSQL |
 | ORM | Spring Data JPA / Hibernate |
 | Validation | Jakarta Bean Validation |
@@ -21,39 +22,89 @@ A production-quality RESTful wallet management API built with Spring Boot, desig
 
 ## 🏗️ Architecture
 
-The project follows a strict **layered architecture**:
+The project follows a strict layered architecture:
 
 ```
 Controller → Service Interface → Service Implementation → Repository → Database
 ```
 
-- **Controllers** handle HTTP concerns only — no business logic
+- **Controllers** handle HTTP concerns and access control only — no business logic
 - **Service Interfaces** define contracts, decoupling implementation from consumption
 - **Service Implementations** own all business rules and transaction logic
 - **Repositories** handle all database interaction via Spring Data JPA
-- **DTOs** ensure the internal data model is never exposed directly to the API layer
+- **DTOs** ensure the internal domain model is never exposed directly to the API layer
+- **SecurityUtils** provides a shared utility for extracting the authenticated user from the `SecurityContextHolder`
+
+---
+
+## 🔒 Security Architecture
+
+Authentication is handled via **stateless JWT tokens**. No sessions are created or stored server-side.
+
+### Authentication Flow
+
+```
+POST /auth/login
+       ↓
+AuthenticationManager → DaoAuthenticationProvider
+       ↓
+UserDetailsService loads User from DB
+       ↓
+BCrypt verifies password
+       ↓
+JwtService generates signed token
+       ↓
+Token returned to client
+```
+
+### Request Flow (subsequent requests)
+
+```
+Request with Authorization: Bearer <token>
+       ↓
+JwtAuthenticationFilter (OncePerRequestFilter)
+       ↓
+JwtService validates token signature + expiry
+       ↓
+User loaded and placed in SecurityContextHolder
+       ↓
+Controller / Service reads authenticated user
+```
+
+### Role Model
+
+| Role | Capabilities |
+|---|---|
+| `USER` | Register, login, view own wallet, deposit, withdraw, transfer, view own transaction history |
+| `ADMIN` | View all wallets, view any transaction by ID, view any wallet's transaction history |
 
 ---
 
 ## 💡 Key Engineering Decisions
 
-### BigDecimal for Money
+**BigDecimal for Money**
 All monetary values use `BigDecimal` — never `double` or `float`. Floating-point arithmetic introduces rounding errors that are unacceptable in financial systems.
 
-### Immutable Transaction Records
-The `Transaction` entity has no setters. Once a transaction is recorded, it cannot be modified. This is intentional — financial audit trails must be tamper-proof.
+**Stateless JWT Authentication**
+Every request is authenticated independently via a signed JWT token. No server-side sessions means the API scales horizontally without shared session storage.
 
-### Defensive Balance Management
+**Ownership Enforcement at the Service Layer**
+All user-facing operations derive the acting wallet from the authenticated principal via `SecurityContextHolder` — never from a client-supplied ID. A user cannot perform operations on another user's wallet by guessing an ID.
+
+**Immutable Transaction Records**
+The `Transaction` entity has no setters. Once a transaction is recorded, it cannot be modified. Financial audit trails must be tamper-proof.
+
+**Defensive Balance Management**
 The `Wallet` entity owns its own balance logic via `credit()` and `debit()` methods. The wallet protects its own state — it will never allow its balance to go negative, regardless of what calls it.
 
-### Soft Delete
+**Soft Delete**
 Wallets are never hard-deleted from the database. Deactivating a wallet sets `isActive = false`, preserving the complete transaction history for audit purposes. This mirrors how real financial institutions handle account closure.
 
-### Transactional Integrity
-All fund movement operations (`deposit`, `withdraw`, `transfer`) are wrapped in `@Transactional`. If any step fails mid-operation — for example, crediting the receiver after debiting the sender — the entire operation rolls back, preventing money from disappearing.
+**Transactional Integrity**
+All fund movement operations (deposit, withdraw, transfer) are wrapped in `@Transactional`. If any step fails mid-operation, the entire operation rolls back, preventing money from disappearing.
 
-### Global Exception Handling
-A `@ControllerAdvice` global exception handler intercepts all custom business exceptions and returns structured JSON error responses with appropriate HTTP status codes, rather than exposing raw stack traces.
+**Global Exception Handling**
+A `@ControllerAdvice` global exception handler intercepts all custom business exceptions and returns structured JSON error responses with appropriate HTTP status codes.
 
 ---
 
@@ -61,11 +112,20 @@ A `@ControllerAdvice` global exception handler intercepts all custom business ex
 
 ```
 src/main/java/com/olamide/miniwalletapi/
+├── Configuration/
+│   ├── SecurityConfiguration.java
+│   ├── JwtAuthenticationFilter.java
+│   ├── JwtService.java
+│   ├── SecurityUtils.java
+│   └── DataSeeder.java
 ├── Controller/
+│   ├── AuthController.java
 │   ├── WalletController.java
 │   └── TransactionController.java
 ├── DTO/
-│   ├── UserRequestDTO.java
+│   ├── RegisterUserDTO.java
+│   ├── LoginRequestDTO.java
+│   ├── AuthResponseDTO.java
 │   ├── UserResponseDTO.java
 │   ├── DepositRequestDTO.java
 │   ├── WithdrawRequestDTO.java
@@ -80,18 +140,23 @@ src/main/java/com/olamide/miniwalletapi/
 │   ├── InvalidWalletDetailsException.java
 │   └── WalletDeactivatedException.java
 ├── Models/
+│   ├── User.java
 │   ├── Wallet.java
-│   └── Transaction.java
+│   ├── Transaction.java
+│   └── Role.java (enum)
 ├── Repository/
+│   ├── UserRepository.java
 │   ├── WalletRepository.java
 │   └── TransactionRepository.java
-├── Service/
-│   ├── WalletService.java
-│   ├── TransactionService.java
-│   └── ServiceImpl/
-│       ├── WalletServiceImpl.java
-│       └── TransactionServiceImpl.java
-└── TransactionType.java (enum)
+└── Service/
+    ├── AuthService.java
+    ├── WalletService.java
+    ├── TransactionService.java
+    └── ServiceImpl/
+        ├── AuthServiceImpl.java
+        ├── CustomerUserDetailsServiceImpl.java
+        ├── WalletServiceImpl.java
+        └── TransactionServiceImpl.java
 ```
 
 ---
@@ -99,113 +164,151 @@ src/main/java/com/olamide/miniwalletapi/
 ## ⚙️ Getting Started
 
 ### Prerequisites
+
 - Java 21+
 - PostgreSQL running locally
 - Maven
 
 ### Setup
 
-1. **Clone the repository**
+1. Clone the repository
+
 ```bash
 git clone https://github.com/yourusername/mini-wallet-api.git
 cd mini-wallet-api
 ```
 
-2. **Configure your database**
+2. Configure your database and JWT secret in `application.properties`
 
-Copy the example properties file and fill in your credentials:
-```bash
-cp src/main/resources/application.properties.example src/main/resources/application.properties
-```
-
-Edit `application.properties`:
 ```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/postgres
-spring.datasource.username=postgres
-spring.datasource.password=YOUR_PASSWORD_HERE
+spring.datasource.url=jdbc:postgresql://localhost:5432/wallet_db
+spring.datasource.username=your_username
+spring.datasource.password=your_password
 spring.jpa.hibernate.ddl-auto=update
+
+jwt.secret=your-base64-encoded-256-bit-secret-key-here
+jwt.expiration=86400000
 ```
 
-3. **Run the application**
+> ⚠️ Never commit real credentials or your JWT secret to version control. Use environment variables or a `.env` file in production.
+
+3. Run the application
+
 ```bash
 mvn spring-boot:run
 ```
 
-The API will be available at `http://localhost:8080`
+The API will be available at `http://localhost:8080`.
+
+On first startup, an admin user is automatically seeded:
+- Email: `admin@wallet.com`
+- Password: `admin123`
 
 ---
 
 ## 📡 API Endpoints
 
-### Wallet Endpoints
+### Auth Endpoints (public)
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/mini_wallet/api` | Create a new wallet |
-| `GET` | `/mini_wallet/api/{id}` | Find wallet by ID |
-| `GET` | `/mini_wallet/api/number/{walletNumber}` | Find wallet by wallet number |
-| `DELETE` | `/mini_wallet/api/{id}` | Deactivate a wallet (soft delete) |
+|---|---|---|
+| POST | `/auth/register` | Register a new user (creates wallet automatically) |
+| POST | `/auth/login` | Login and receive a JWT token |
+
+### Wallet Endpoints
+
+| Method | Endpoint | Role | Description |
+|---|---|---|---|
+| GET | `/mini_wallet/api/me` | USER | Get your own wallet |
+| GET | `/mini_wallet/api/{id}` | USER / ADMIN | Get wallet by ID (USER can only access their own) |
+| GET | `/mini_wallet/api` | ADMIN | Get all wallets |
+| DELETE | `/mini_wallet/api/{id}` | ADMIN | Deactivate a wallet (soft delete) |
 
 ### Transaction Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/transactions/deposit` | Deposit funds into a wallet |
-| `POST` | `/api/transactions/withdraw` | Withdraw funds from a wallet |
-| `POST` | `/api/transactions/transfer` | Transfer funds between wallets |
-| `GET` | `/api/transactions/{walletId}/history` | Get full transaction history for a wallet |
-| `GET` | `/api/transactions/transactions/{transactionId}` | Get a specific transaction by ID |
+| Method | Endpoint | Role | Description |
+|---|---|---|---|
+| POST | `/api/transactions/deposit` | USER | Deposit into your wallet |
+| POST | `/api/transactions/withdraw` | USER | Withdraw from your wallet |
+| POST | `/api/transactions/transfer` | USER | Transfer to another wallet |
+| GET | `/api/transactions/history` | USER | Get your own transaction history |
+| GET | `/api/transactions/{walletId}/history` | ADMIN | Get any wallet's transaction history |
+| GET | `/api/transactions/{transactionId}` | ADMIN | Get a specific transaction by ID |
 
 ---
 
 ## 📋 Request & Response Examples
 
-### Create Wallet
+### Register
+
 ```http
-POST /mini_wallet/api
+POST /auth/register
 Content-Type: application/json
 
 {
-  "ownerName": "Olamide"
+  "email": "ola@test.com",
+  "password": "password123"
 }
 ```
+
 ```json
 {
-  "ownerName": "Olamide",
+  "message": "Registration successful! Wallet Created",
+  "email": "ola@test.com",
   "walletNumber": "550e8400-e29b-41d4-a716-446655440000",
-  "balance": 0
+  "token": null
 }
 ```
 
-### Deposit
+### Login
+
 ```http
-POST /api/transactions/deposit
+POST /auth/login
 Content-Type: application/json
 
 {
-  "destinationWalletId": 1,
-  "amount": 5000
+  "email": "ola@test.com",
+  "password": "password123"
 }
 ```
+
 ```json
 {
-  "sourceWalletId": null,
-  "destinationWalletId": 1,
-  "amount": 5000,
-  "type": "DEPOSIT",
-  "timestamp": "2026-05-20T10:00:00Z"
+  "message": "Login successful",
+  "email": "ola@test.com",
+  "walletNumber": "550e8400-e29b-41d4-a716-446655440000",
+  "token": "eyJhbGciOiJIUzI1NiJ9..."
 }
+```
+
+### Authenticated Request
+
+All protected endpoints require the token in the Authorization header:
+
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 ```
 
 ### Transfer
+
 ```http
 POST /api/transactions/transfer
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "sourceWalletId": 1,
   "destinationWalletId": 2,
   "amount": 2000
+}
+```
+
+```json
+{
+  "sourceWalletId": 1,
+  "destinationWalletId": 2,
+  "amount": 2000,
+  "transactionType": "TRANSFER",
+  "timestamp": "2026-06-08T10:00:00Z"
 }
 ```
 
@@ -220,6 +323,8 @@ Content-Type: application/json
 - ✅ Deactivated wallets cannot send or receive funds
 - ✅ Transaction history is permanently preserved — even after wallet deactivation
 - ✅ Transfers are atomic — both wallets update or neither does
+- ✅ A user can only operate on their own wallet — ownership is enforced at the service layer, not just the controller
+- ✅ Passwords are hashed with BCrypt before storage — plain-text passwords are never persisted
 
 ---
 
@@ -231,7 +336,7 @@ All errors return a structured JSON response:
 {
   "error": "INSUFFICIENT_FUNDS",
   "message": "Amount greater than balance",
-  "timestamp": "2026-05-20T10:00:00"
+  "timestamp": "2026-06-08T10:00:00"
 }
 ```
 
@@ -242,14 +347,17 @@ All errors return a structured JSON response:
 | `INVALID_AMOUNT` | 400 | Amount is zero or negative |
 | `INVALID_WALLET_DETAILS` | 400 | Missing or invalid wallet information |
 | `WALLET_DEACTIVATED` | 400 | Wallet exists but is deactivated |
+| `INVALID_TRANSACTION` | 400 | Transfer attempted to same wallet |
 
 ---
 
 ## 🛣️ Roadmap
 
-- [ ] Spring Security + JWT authentication
-- [ ] Lombok for boilerplate reduction
-- [ ] MapStruct for DTO mapping
+- [x] Core wallet and transaction operations
+- [x] Spring Security + JWT authentication
+- [x] Role-based access control (USER / ADMIN)
+- [x] Ownership enforcement via SecurityContextHolder
+- [ ] JWT refresh tokens
 - [ ] Unit and integration tests
 - [ ] Docker containerisation
 - [ ] Database migrations with Flyway
@@ -258,5 +366,4 @@ All errors return a structured JSON response:
 
 ## 👨‍💻 Author
 
-**Olamide**
-Backend Developer — building real-world systems one layer at a time.
+**Olamide** — Backend Developer, building real-world systems one layer at a time.
