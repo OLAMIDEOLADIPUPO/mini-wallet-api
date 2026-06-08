@@ -10,7 +10,6 @@ import java.util.List;
 
 public interface TransactionService {
 
-    TransactionResponseDTO save(Transaction transaction);
 
     TransactionResponseDTO deposit(DepositRequestDTO request);
 
@@ -20,5 +19,5 @@ public interface TransactionService {
 
     TransactionResponseDTO findById(Long id);
 
-    List<TransactionResponseDTO> getTransactionHistory(Long walletId);
+    List<TransactionResponseDTO> getTransactionHistory();
 }

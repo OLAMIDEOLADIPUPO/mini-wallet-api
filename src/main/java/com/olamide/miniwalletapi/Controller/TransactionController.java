@@ -37,9 +37,9 @@ public class TransactionController {
         return ResponseEntity.ok(transactionService.transfer(transferRequestDTO));
     }
 
-    @GetMapping("/{walletId}/history") // Made more explicit: GET api/transactions/5/history
+    @GetMapping("/{walletId}/history")
     public ResponseEntity<List<TransactionResponseDTO>> getTransactionHistory(@PathVariable Long walletId) {
-        List<TransactionResponseDTO> history = transactionService.getTransactionHistory(walletId);
+        List<TransactionResponseDTO> history = transactionService.getTransactionHistory();
         return ResponseEntity.ok(history);
     }
 
