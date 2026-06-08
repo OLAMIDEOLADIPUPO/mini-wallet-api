@@ -1,7 +1,6 @@
 package com.olamide.miniwalletapi.Configuration;
 
 import com.olamide.miniwalletapi.Service.CustomerUserDetailsService;
-import com.olamide.miniwalletapi.Service.ServiceImpl.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

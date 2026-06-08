@@ -19,5 +19,7 @@ public interface TransactionService {
 
     TransactionResponseDTO findById(Long id);
 
-    List<TransactionResponseDTO> getTransactionHistory();
+    List<TransactionResponseDTO> getTransactionHistory(Long walletId);
+
+    List<TransactionResponseDTO> getMyTransactionHistory();
 }

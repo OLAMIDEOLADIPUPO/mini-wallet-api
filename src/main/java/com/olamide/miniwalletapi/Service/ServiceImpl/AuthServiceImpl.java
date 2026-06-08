@@ -1,9 +1,11 @@
 package com.olamide.miniwalletapi.Service.ServiceImpl;
 
+import com.olamide.miniwalletapi.Configuration.JwtService;
 import com.olamide.miniwalletapi.DTO.AuthResponseDTO;
 import com.olamide.miniwalletapi.DTO.LoginRequestDTO;
 import com.olamide.miniwalletapi.DTO.RegisterUserDTO;
 import com.olamide.miniwalletapi.Exceptions.InvalidWalletDetailsException;
+import com.olamide.miniwalletapi.Exceptions.WalletNotFoundException;
 import com.olamide.miniwalletapi.Models.Role;
 import com.olamide.miniwalletapi.Models.User;
 import com.olamide.miniwalletapi.Models.Wallet;
@@ -74,11 +76,14 @@ public class AuthServiceImpl implements AuthService {
                         "User not found"));
 
         String token  = jwtService.generateToken(user);
+        Wallet wallet = walletRepository.findByUser(user)
+                .orElseThrow(() -> new WalletNotFoundException(
+                        "No wallet found for user"));
 
         return new  AuthResponseDTO(
                 "Login successful",
                 user.getEmail(),
-                user.getWallet().getWalletNumber(),
+                wallet.getWalletNumber(),
                 token
         );
     }

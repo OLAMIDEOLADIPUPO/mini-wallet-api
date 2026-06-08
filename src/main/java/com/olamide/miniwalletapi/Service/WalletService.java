@@ -11,9 +11,12 @@ public interface WalletService {
 
     List<UserResponseDTO> getWallets();
 
+    UserResponseDTO getMyWallet();
+
     UserResponseDTO findWalletById(Long id);
 
     UserResponseDTO findByWalletNumber(UUID walletNumber);
 
     UserResponseDTO deleteWallet(Long id);
+
 }

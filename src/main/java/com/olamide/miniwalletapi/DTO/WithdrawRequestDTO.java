@@ -9,5 +9,4 @@ import java.math.BigDecimal;
 public record WithdrawRequestDTO(
         @Positive(message = "Amount must be greater than zero")
         BigDecimal amount
-) {
-}
+) {}

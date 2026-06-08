@@ -1,9 +1,7 @@
     package com.olamide.miniwalletapi.Service.ServiceImpl;
     
-    import com.olamide.miniwalletapi.DTO.DepositRequestDTO;
-    import com.olamide.miniwalletapi.DTO.TransactionResponseDTO;
-    import com.olamide.miniwalletapi.DTO.TransferRequestDTO;
-    import com.olamide.miniwalletapi.DTO.WithdrawRequestDTO;
+    import com.olamide.miniwalletapi.Configuration.SecurityUtils;
+    import com.olamide.miniwalletapi.DTO.*;
     import com.olamide.miniwalletapi.Exceptions.InvalidTransactionException;
     import com.olamide.miniwalletapi.Exceptions.WalletDeactivatedException;
     import com.olamide.miniwalletapi.Exceptions.WalletNotFoundException;
@@ -34,17 +32,7 @@
 
 
         private Wallet getAuthenticatedWallet()  {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if(authentication == null || !authentication.isAuthenticated()){
-                throw new AccessDeniedException("You are not authorized to perform this action.");
-            }
-
-            Object principal =  authentication.getPrincipal();
-            if(!(principal instanceof User currentUser)){
-                throw new AccessDeniedException("Unexpected principal type");
-
-            }
-
+            User currentUser = SecurityUtils.getAuthenticatedUser();
             return walletRepository.findByUser(currentUser)
                     .orElseThrow(() -> new WalletNotFoundException("No wallet found for authenticated user"));
 
@@ -68,11 +56,11 @@
             }
 
                 found.credit(request.amount());
-    
+
                 Transaction newTransaction = new Transaction(TransactionType.DEPOSIT,request.amount(),null,found.getId());
                 walletRepository.save(found);
                 return save(newTransaction);
-    
+
 
         }
 
@@ -86,10 +74,10 @@
             found.debit(request.amount());
             Transaction newTransaction = new Transaction(TransactionType.WITHDRAW,request.amount(), found.getId(), null);
             walletRepository.save(found);
-    
+
             return save(newTransaction);
-    
-    
+
+
         }
 
         @Override
@@ -125,29 +113,36 @@
         @Override
         public TransactionResponseDTO findById(Long Id) {
             return (transactionRepository.findById(Id).map(
-                    transaction -> new TransactionResponseDTO(
-                            transaction.getSourceWalletId(),
-                            transaction.getDestinationWalletId(),
-                            transaction.getAmount(),
-                            transaction.getType(),
-                            transaction.getTimestamp()
+                    this::mapToDTO
                     )
-            ).orElseThrow(() -> new WalletNotFoundException("No transaction with id " + Id)));
+            ).orElseThrow(() -> new WalletNotFoundException("No transaction with id " + Id));
+        }
+
+        @Override
+        public List<TransactionResponseDTO> getTransactionHistory(Long walletId) {
+            return transactionRepository.findAllByWalletId(walletId).stream()
+                    .map(this::mapToDTO).toList();
+
         }
 
 
         @Override
-        public List<TransactionResponseDTO> getTransactionHistory() {
+        public List<TransactionResponseDTO> getMyTransactionHistory() {
             Wallet wallet = getAuthenticatedWallet();
             return transactionRepository.findAllByWalletId(wallet.getId())
                     .stream()
-                    .map(transaction -> new TransactionResponseDTO(
-                            transaction.getSourceWalletId(),
-                            transaction.getDestinationWalletId(),
-                            transaction.getAmount(),
-                            transaction.getType(),
-                            transaction.getTimestamp()
-                    ))
+                    .map(this::mapToDTO)
                     .toList();
+        }
+
+
+        private TransactionResponseDTO mapToDTO(Transaction transaction) {
+            return new TransactionResponseDTO(
+                    transaction.getSourceWalletId(),
+                    transaction.getDestinationWalletId(),
+                    transaction.getAmount(),
+                    transaction.getType(),
+                    transaction.getTimestamp()
+            );
         }
     }

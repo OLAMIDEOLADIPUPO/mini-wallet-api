@@ -7,6 +7,7 @@ import com.olamide.miniwalletapi.DTO.WithdrawRequestDTO;
 import com.olamide.miniwalletapi.Service.TransactionService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,28 +23,40 @@ public class TransactionController {
     }
 
     @PostMapping("/deposit")
-    public ResponseEntity<TransactionResponseDTO> deposit(@Valid @RequestBody DepositRequestDTO depositRequestDTO) {
-        // Returning a ResponseEntity explicitly shows the HTTP Status (201 Created or 200 OK)
-        return ResponseEntity.ok(transactionService.deposit(depositRequestDTO));
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<TransactionResponseDTO> deposit(
+            @Valid @RequestBody DepositRequestDTO request) {
+        return ResponseEntity.ok(transactionService.deposit(request));
     }
 
     @PostMapping("/withdraw")
-    public ResponseEntity<TransactionResponseDTO> withdraw(@Valid @RequestBody WithdrawRequestDTO withdrawRequestDTO) {
-        return ResponseEntity.ok(transactionService.withdraw(withdrawRequestDTO));
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<TransactionResponseDTO> withdraw(
+            @Valid @RequestBody WithdrawRequestDTO request) {
+        return ResponseEntity.ok(transactionService.withdraw(request));
     }
 
     @PostMapping("/transfer")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<TransactionResponseDTO> transfer(@Valid @RequestBody TransferRequestDTO transferRequestDTO) {
         return ResponseEntity.ok(transactionService.transfer(transferRequestDTO));
     }
 
+    @GetMapping("/history")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<List<TransactionResponseDTO>> getMyTransactionHistory() {
+        List<TransactionResponseDTO> history = transactionService.getMyTransactionHistory();
+        return ResponseEntity.ok(history);
+    }
     @GetMapping("/{walletId}/history")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<TransactionResponseDTO>> getTransactionHistory(@PathVariable Long walletId) {
-        List<TransactionResponseDTO> history = transactionService.getTransactionHistory();
+        List<TransactionResponseDTO> history = transactionService.getTransactionHistory(walletId);
         return ResponseEntity.ok(history);
     }
 
-    @GetMapping("/transactions/{transactionId}")
+    @GetMapping("details/{transactionId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<TransactionResponseDTO> getTransactionbyId(@PathVariable Long transactionId) {
         return ResponseEntity.ok(transactionService.findById(transactionId));
 

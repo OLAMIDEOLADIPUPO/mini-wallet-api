@@ -1,19 +1,18 @@
 package com.olamide.miniwalletapi.Service.ServiceImpl;
 
+import com.olamide.miniwalletapi.Configuration.SecurityUtils;
 import com.olamide.miniwalletapi.DTO.UserResponseDTO;
 
 import com.olamide.miniwalletapi.Exceptions.WalletDeactivatedException;
 import com.olamide.miniwalletapi.Exceptions.WalletNotFoundException;
+import com.olamide.miniwalletapi.Models.User;
 import com.olamide.miniwalletapi.Models.Wallet;
-import com.olamide.miniwalletapi.Repository.UserRepository;
 import com.olamide.miniwalletapi.Repository.WalletRepository;
 import com.olamide.miniwalletapi.Service.WalletService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
-
-import static java.util.stream.Collectors.toList;
 
 @Service
 public class WalletServiceImpl implements WalletService {
@@ -38,6 +37,14 @@ public class WalletServiceImpl implements WalletService {
                .map(this::mapToDTO)
        .toList();
 
+    }
+    @Override
+    public UserResponseDTO getMyWallet() {
+        User currentUser = SecurityUtils.getAuthenticatedUser();
+        Wallet wallet = walletRepository.findByUser(currentUser)
+                .orElseThrow(() -> new WalletNotFoundException(
+                        "No wallet found for current user"));
+        return mapToDTO(wallet);
     }
 
     public UserResponseDTO findWalletById(Long id){
