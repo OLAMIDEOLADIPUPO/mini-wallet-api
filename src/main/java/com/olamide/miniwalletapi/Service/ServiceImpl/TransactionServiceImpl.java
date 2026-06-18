@@ -8,26 +8,28 @@
     import com.olamide.miniwalletapi.Models.Transaction;
     import com.olamide.miniwalletapi.Models.User;
     import com.olamide.miniwalletapi.Models.Wallet;
+    import com.olamide.miniwalletapi.Repository.IdempotencyRecordRepository;
     import com.olamide.miniwalletapi.Repository.TransactionRepository;
     import com.olamide.miniwalletapi.Repository.WalletRepository;
     import com.olamide.miniwalletapi.Service.TransactionService;
     import com.olamide.miniwalletapi.TransactionType;
-    import org.springframework.security.core.Authentication;
-    import org.springframework.security.core.context.SecurityContextHolder;
+    import org.springframework.data.domain.Pageable;
+    import org.springframework.data.domain.Slice;
     import org.springframework.stereotype.Service;
     import org.springframework.transaction.annotation.Transactional;
-    import org.springframework.security.access.AccessDeniedException;
 
-    import java.util.List;
+    import java.util.Optional;
 
     @Service
     public class TransactionServiceImpl implements TransactionService {
         private final TransactionRepository transactionRepository;
         private final WalletRepository walletRepository;
+        private final IdempotencyRecordServiceImpl idempotencyRecordService;
     
-        public TransactionServiceImpl(TransactionRepository transactionRepository, WalletRepository walletRepository) {
+        public TransactionServiceImpl(TransactionRepository transactionRepository, WalletRepository walletRepository,IdempotencyRecordServiceImpl idempotencyRecordService) {
             this.transactionRepository = transactionRepository;
             this.walletRepository = walletRepository;
+            this.idempotencyRecordService = idempotencyRecordService;
         }
 
 
@@ -49,8 +51,13 @@
 
         @Override
         @Transactional
-        public TransactionResponseDTO deposit(DepositRequestDTO request) {
-                Wallet found = getAuthenticatedWallet();
+        public TransactionResponseDTO deposit(DepositRequestDTO request,String idempotencyKey) {
+            Optional<TransactionResponseDTO> existingResponse = idempotencyRecordService.findExistingResponse(idempotencyKey);
+            if(existingResponse.isPresent()) {
+                return existingResponse.get();
+            }
+
+            Wallet found = getAuthenticatedWallet();
             if (!found.isActive()) {
                 throw new WalletDeactivatedException("Cannot deposit:  wallet is deactivated.");
             }
@@ -59,14 +66,20 @@
 
                 Transaction newTransaction = new Transaction(TransactionType.DEPOSIT,request.amount(),null,found.getId());
                 walletRepository.save(found);
-                return save(newTransaction);
+                TransactionResponseDTO result  = save(newTransaction);
+                idempotencyRecordService.saveResponse(idempotencyKey,result,newTransaction.getId());
+                return result;
 
 
         }
 
         @Override
         @Transactional
-        public TransactionResponseDTO withdraw(WithdrawRequestDTO request) {
+        public TransactionResponseDTO withdraw(WithdrawRequestDTO request,String idempotencyKey) {
+            Optional<TransactionResponseDTO> existingResponse = idempotencyRecordService.findExistingResponse(idempotencyKey);
+            if(existingResponse.isPresent()) {
+                return existingResponse.get();
+            }
             Wallet found = getAuthenticatedWallet();
             if (!found.isActive()) {
                 throw new WalletDeactivatedException("Cannot withdraw: Source wallet is deactivated.");
@@ -75,14 +88,20 @@
             Transaction newTransaction = new Transaction(TransactionType.WITHDRAW,request.amount(), found.getId(), null);
             walletRepository.save(found);
 
-            return save(newTransaction);
+            TransactionResponseDTO result  = save(newTransaction);
+            idempotencyRecordService.saveResponse(idempotencyKey,result,newTransaction.getId());
+            return result;
 
 
         }
 
         @Override
         @Transactional
-        public TransactionResponseDTO transfer(TransferRequestDTO transferRequest) {
+        public TransactionResponseDTO transfer(TransferRequestDTO transferRequest,String idempotencyKey) {
+            Optional<TransactionResponseDTO> existingResponse = idempotencyRecordService.findExistingResponse(idempotencyKey);
+            if(existingResponse.isPresent()) {
+                return existingResponse.get();
+            }
             Wallet sender = getAuthenticatedWallet();
             if (sender.getId().equals(transferRequest.destinationWalletId())) {
                 throw new InvalidTransactionException("Transfer failed: Source and destination wallets cannot be the same account.");
@@ -105,7 +124,9 @@
                     transferRequest.destinationWalletId());
             walletRepository.save(sender);
             walletRepository.save(receiver);
-            return save(transfer);
+            TransactionResponseDTO result  = save(transfer);
+            idempotencyRecordService.saveResponse(idempotencyKey,result,transfer.getId());
+            return result;
     
     
         }
@@ -119,20 +140,29 @@
         }
 
         @Override
-        public List<TransactionResponseDTO> getTransactionHistory(Long walletId) {
-            return transactionRepository.findAllByWalletId(walletId).stream()
-                    .map(this::mapToDTO).toList();
+        public PagedResponseDTO<TransactionResponseDTO> getTransactionHistory(Long walletId, Pageable pageable) {
+            Slice<TransactionResponseDTO> slice =  transactionRepository.findAllByWalletId(walletId,pageable)
+                    .map(this::mapToDTO);
+            return toPagedResponse(slice);
 
         }
 
 
         @Override
-        public List<TransactionResponseDTO> getMyTransactionHistory() {
+        public PagedResponseDTO<TransactionResponseDTO> getMyTransactionHistory(Pageable pageable) {
             Wallet wallet = getAuthenticatedWallet();
-            return transactionRepository.findAllByWalletId(wallet.getId())
-                    .stream()
-                    .map(this::mapToDTO)
-                    .toList();
+            Slice<TransactionResponseDTO> slice=  transactionRepository.findAllByWalletId(wallet.getId(),pageable)
+                    .map(this::mapToDTO);
+            return toPagedResponse(slice);
+        }
+
+        private PagedResponseDTO<TransactionResponseDTO> toPagedResponse(Slice<TransactionResponseDTO> slice) {
+            return new PagedResponseDTO<TransactionResponseDTO>(
+                    slice.getContent(),
+                    slice.hasNext(),
+                    slice.getNumber(),
+                    slice.getSize()
+            );
         }
 
 

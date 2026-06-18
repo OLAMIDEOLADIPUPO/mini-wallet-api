@@ -1,25 +1,20 @@
 package com.olamide.miniwalletapi.Service;
 
-import com.olamide.miniwalletapi.DTO.DepositRequestDTO;
-import com.olamide.miniwalletapi.DTO.TransactionResponseDTO;
-import com.olamide.miniwalletapi.DTO.TransferRequestDTO;
-import com.olamide.miniwalletapi.DTO.WithdrawRequestDTO;
-import com.olamide.miniwalletapi.Models.Transaction;
-
-import java.util.List;
+import com.olamide.miniwalletapi.DTO.*;
+import org.springframework.data.domain.Pageable;
 
 public interface TransactionService {
 
 
-    TransactionResponseDTO deposit(DepositRequestDTO request);
+    TransactionResponseDTO deposit(DepositRequestDTO request,String idempotencyKey);
 
-    TransactionResponseDTO withdraw(WithdrawRequestDTO request);
+    TransactionResponseDTO withdraw(WithdrawRequestDTO request,String idempotencyKey);
 
-    TransactionResponseDTO transfer(TransferRequestDTO transferRequest);
+    TransactionResponseDTO transfer(TransferRequestDTO transferRequest,String idempotencyKey);
 
     TransactionResponseDTO findById(Long id);
 
-    List<TransactionResponseDTO> getTransactionHistory(Long walletId);
+    PagedResponseDTO<TransactionResponseDTO> getTransactionHistory(Long walletId, Pageable pageable);
 
-    List<TransactionResponseDTO> getMyTransactionHistory();
+    PagedResponseDTO<TransactionResponseDTO> getMyTransactionHistory(Pageable pageable);
 }
