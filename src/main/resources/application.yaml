@@ -1,0 +1,22 @@
+spring:
+  application:
+    name:MiniWalletAPI
+  datasource:
+    url: jdbc:postgresql://localhost:5432/wallet_db
+    username: postgres
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+    open-in-view: false
+  config:
+    import: "optional:file:.env[.properties]"
+jwt:
+  secret: ${JWT_SECRET_KEY}
+  expiration: 86400000

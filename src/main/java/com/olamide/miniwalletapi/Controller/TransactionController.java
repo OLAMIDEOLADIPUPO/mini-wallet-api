@@ -2,19 +2,20 @@ package com.olamide.miniwalletapi.Controller;
 
 import com.olamide.miniwalletapi.DTO.*;
 import com.olamide.miniwalletapi.Service.TransactionService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("api/transactions")
+@Tag(name = "Transactions", description = "Deposit, withdraw, transfer and transaction history")
+@SecurityRequirement(name = "bearerAuth")
 public class TransactionController {
 
     private final TransactionService transactionService;
@@ -59,6 +60,5 @@ public class TransactionController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<TransactionResponseDTO> getTransactionbyId(@PathVariable Long transactionId) {
         return ResponseEntity.ok(transactionService.findById(transactionId));
-
     }
 }
